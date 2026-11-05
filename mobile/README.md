@@ -33,3 +33,11 @@
 - 设置（含 API Key）保存在手机本地 localStorage，退出不丢。
 - 支持流式输出，四层结果逐层弹出。
 - 也可手动填任意 OpenAI 兼容接口的 Base URL + 模型名 + Key。
+
+## Release 签名
+
+正式签名需在 android/ 目录下放置：
+- yujing-release.keystore（签名密钥，已 gitignore）
+- keystore.properties（含 storeFile/storePassword/keyAlias/keyPassword，已 gitignore）
+
+没有它们时 assembleRelease 生成未签名包；放置后可生成正式签名包。
