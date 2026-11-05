@@ -1,0 +1,8 @@
+{
+  "appId": "com.yujing.app",
+  "appName": "语镜",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

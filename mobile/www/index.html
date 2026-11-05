@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#6366f1">
+<title>语镜 · 移动版</title>
+<style>
+  :root {
+    --bg: #f7f8fc;
+    --card: #ffffff;
+    --text: #18181b;
+    --muted: #71717a;
+    --indigo: #6366f1;
+    --violet: #a855f7;
+    --line: #e4e4e7;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(99,102,241,0.14), transparent 55%),
+      radial-gradient(120% 80% at 100% 0%, rgba(168,85,247,0.12), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    background: rgba(255,255,255,0.75); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    font-size: 20px; font-weight: 800; letter-spacing: 1px;
+    background: linear-gradient(90deg,#4f46e5,#a855f7,#ec4899);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .gear {
+    width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line);
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+    padding: 16px; box-shadow: 0 8px 30px -18px rgba(24,24,27,0.25);
+  }
+  .field-label { font-size: 12px; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+  .field-label:first-child { margin-top: 0; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button {
+    border: none; background: #f4f4f5; color: #52525b; font-size: 13px; font-weight: 500;
+    padding: 7px 13px; border-radius: 999px; cursor: pointer; transition: all .15s;
+  }
+  .seg button.on { background: #18181b; color: #fff; }
+  textarea {
+    width: 100%; min-height: 96px; margin-top: 6px; resize: none;
+    border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px;
+    font-size: 15px; font-family: inherit; line-height: 1.6; color: var(--text);
+    outline: none; background: #fafafa;
+  }
+  textarea:focus { border-color: var(--indigo); background: #fff; box-shadow: 0 0 0 4px rgba(99,102,241,0.12); }
+  #analyzeBtn {
+    width: 100%; margin-top: 16px; border: none; cursor: pointer;
+    background: linear-gradient(90deg,#6366f1,#a855f7,#ec4899);
+    color: #fff; font-size: 15px; font-weight: 700; padding: 14px; border-radius: 16px;
+    box-shadow: 0 6px 20px -6px rgba(99,102,241,0.6);
+  }
+  #analyzeBtn:disabled { opacity: 0.5; }
+  .res-card {
+    display: flex; gap: 12px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; padding: 14px; margin-top: 10px; transition: all .25s;
+  }
+  .res-bar { width: 4px; border-radius: 4px; align-self: stretch; }
+  .res-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .res-title { font-size: 14px; font-weight: 700; }
+  .res-sub { font-size: 11px; color: var(--muted); margin-left: 6px; font-weight: 400; }
+  .res-body { font-size: 14px; line-height: 1.65; color: #3f3f46; white-space: pre-wrap; margin-top: 6px; }
+  .res-body .wait { color: #d4d4d8; }
+  .cursor { display: inline-block; width: 2px; height: 1em; background: #6366f1; vertical-align: -2px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .sk { height: 12px; border-radius: 6px; background: #f4f4f5; margin: 6px 0; animation: sk 1.2s infinite; }
+  .sk.w60 { width: 60%; } .sk.w80 { width: 80%; }
+  @keyframes sk { 50% { opacity: 0.5; } }
+  #err {
+    display: none; margin-top: 12px; padding: 12px 14px; border-radius: 14px;
+    background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; font-size: 13px; line-height: 1.6;
+  }
+  #err button { margin-left: 8px; background: #fee2e2; border: none; border-radius: 8px; padding: 4px 10px; color: #b91c1c; cursor: pointer; }
+  .sheet {
+    position: fixed; inset: 0; z-index: 50; display: none; align-items: flex-end;
+  }
+  .sheet.open { display: flex; }
+  .sheet-mask { position: absolute; inset: 0; background: rgba(24,24,27,0.4); }
+  .sheet-panel {
+    position: relative; width: 100%; max-width: 560px; margin: 0 auto;
+    background: #fff; border-radius: 24px 24px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    max-height: 86vh; overflow-y: auto; animation: up .25s ease-out;
+  }
+  @keyframes up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sheet-title { font-size: 16px; font-weight: 700; }
+  .preset {
+    display: flex; align-items: center; gap: 10px; border: 1px solid var(--line);
+    border-radius: 14px; padding: 11px 13px; margin-top: 8px; cursor: pointer; transition: all .15s;
+  }
+  .preset.on { border-color: var(--indigo); background: #eef2ff; }
+  .preset .nm { font-size: 14px; font-weight: 600; }
+  .preset .desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .preset .dot { width: 8px; height: 8px; border-radius: 50%; background: #d4d4d8; margin-left: auto; }
+  .preset.on .dot { background: var(--indigo); }
+  .inp {
+    width: 100%; margin-top: 8px; border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; background: #fafafa;
+  }
+  .inp:focus { border-color: var(--indigo); }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .sheet-actions button {
+    flex: 1; border: none; border-radius: 14px; padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  #saveSettings { background: #18181b; color: #fff; }
+  #closeSettings { background: #f4f4f5; color: #52525b; }
+  .badge {
+    display: inline-block; font-size: 11px; color: #059669; background: #ecfdf5;
+    border-radius: 999px; padding: 3px 9px; margin-left: 8px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">语镜</div>
+  <div class="gear" id="gearBtn" onclick="openSheet()">⚙️</div>
+</header>
+
+<main>
+  <section class="card">
+    <div class="field-label">目标语言</div>
+    <div class="seg" id="langSeg"></div>
+    <div class="field-label">交流对象</div>
+    <div class="seg" id="audSeg"></div>
+    <div class="field-label">场合</div>
+    <div class="seg" id="occSeg"></div>
+    <div class="field-label">要诊断的句子</div>
+    <textarea id="input" placeholder="写一句你想诊断的外语…"></textarea>
+    <button id="analyzeBtn" onclick="analyze()">✨ 一键诊断</button>
+    <div id="err"></div>
+  </section>
+
+  <section id="results"></section>
+</main>
+
+<div class="sheet" id="sheet">
+  <div class="sheet-mask" onclick="closeSheet()"></div>
+  <div class="sheet-panel">
+    <div class="sheet-title">AI 模型设置</div>
+    <div id="presets"></div>
+    <div class="field-label">API 地址（Base URL）</div>
+    <input class="inp" id="baseInput" placeholder="https://.../v1">
+    <div class="field-label">模型名</div>
+    <input class="inp" id="modelInput" placeholder="glm-4-flash">
+    <div class="field-label">API Key</div>
+    <input class="inp" id="keyInput" type="password" placeholder="粘贴你的 Key">
+    <div class="hint" id="keyHint"></div>
+    <div class="sheet-actions">
+      <button id="closeSettings" onclick="closeSheet()">取消</button>
+      <button id="saveSettings" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var PRESETS = [
+  { id: "glm", nm: "智谱 GLM-4-Flash", desc: "免费 · 国内直连", base: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash", keyHint: "去 open.bigmodel.cn 注册获取" },
+  { id: "groq", nm: "Groq · Llama", desc: "免费额度 · 超快", base: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", keyHint: "去 console.groq.com 注册获取" },
+  { id: "sf", nm: "硅基流动 SiliconFlow", desc: "免费额度 · 模型多", base: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-7B-Instruct", keyHint: "去 cloud.siliconflow.cn 注册获取" }
+];
+
+var LANGS = ["英语", "日语", "韩语"];
+var AUDS = ["老师", "同学", "陌生人", "长辈"];
+var OCCS = ["正式", "半正式", "日常"];
+
+var SECTIONS = [
+  { key: "grammar", title: "语法", sub: "有没有错", bar: "#10b981", bg: "#ecfdf5", fg: "#059669" },
+  { key: "natural", title: "地道", sub: "像不像母语者", bar: "#3b82f6", bg: "#eff6ff", fg: "#2563eb" },
+  { key: "polite", title: "得体", sub: "语境合不合适", bar: "#f59e0b", bg: "#fffbeb", fg: "#d97706" },
+  { key: "rewrite", title: "母语者改写", sub: "更地道的说法", bar: "#8b5cf6", bg: "#f5f3ff", fg: "#7c3aed" }
+];
+
+var state = {
+  lang: "英语", audience: "老师", occasion: "正式", input: "",
+  presetId: localStorage.getItem("yj_preset") || "glm",
+  base: localStorage.getItem("yj_base") || PRESETS[0].base,
+  model: localStorage.getItem("yj_model") || PRESETS[0].model,
+  key: localStorage.getItem("yj_key") || "",
+  sections: {}, active: null, status: "idle"
+};
+
+function buildSeg(elId, opts, cur, cb) {
+  var el = document.getElementById(elId);
+  el.innerHTML = "";
+  opts.forEach(function(o) {
+    var b = document.createElement("button");
+    b.textContent = o;
+    if (o === cur) b.className = "on";
+    b.onclick = function() { cb(o); };
+    el.appendChild(b);
+  });
+}
+
+function render() {
+  buildSeg("langSeg", LANGS, state.lang, function(v){ state.lang = v; render(); });
+  buildSeg("audSeg", AUDS, state.audience, function(v){ state.audience = v; render(); });
+  buildSeg("occSeg", OCCS, state.occasion, function(v){ state.occasion = v; render(); });
+
+  var btn = document.getElementById("analyzeBtn");
+  btn.disabled = !state.input.trim() || state.status === "loading";
+  btn.textContent = state.status === "loading" ? "正在诊断…" : "✨ 一键诊断";
+
+  var rs = document.getElementById("results");
+  rs.innerHTML = "";
+  SECTIONS.forEach(function(s) {
+    var c = document.createElement("div");
+    c.className = "res-card";
+    var txt = state.sections[s.key];
+    var isActive = state.active === s.key;
+    var bodyHtml = "";
+    if (txt) {
+      bodyHtml = escapeHtml(txt) + (isActive ? '<span class="cursor"></span>' : "");
+    } else if (state.status === "loading") {
+      bodyHtml = '<div class="sk w80"></div><div class="sk w60"></div>';
+    } else {
+      bodyHtml = '<span class="wait">等待分析…</span>';
+    }
+    c.innerHTML =
+      '<div class="res-bar" style="background:' + s.bar + '"></div>' +
+      '<div class="res-icon" style="background:' + s.bg + ';color:' + s.fg + ';font-size:16px">' + iconOf(s.key) + '</div>' +
+      '<div style="flex:1;min-width:0"><div class="res-title">' + s.title + '<span class="res-sub">' + s.sub + '</span></div>' +
+      '<div class="res-body">' + bodyHtml + '</div></div>';
+    rs.appendChild(c);
+  });
+}
+
+function iconOf(k) {
+  return { grammar: "✓", natural: "✦", polite: "⚠", rewrite: "✎" }[k] || "•";
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function buildPrompt() {
+  var L = state.lang, A = state.audience, O = state.occasion;
+  var lines = [
+    "你是一位精通" + L + "及其社会文化习惯的外语教学专家，熟悉中文母语者学习" + L + "时常见的「语用迁移」错误。",
+    "用户会发给你一句" + L + "文本，请逐层诊断。",
+    "请严格按四段输出，每段以「## 标题」开头（标题只能是：语法、地道、得体、改写），不要输出四段之外的内容。",
+    "## 语法",
+    "判断语法是否有误；有误则指出并改正，无误写「语法正确」。",
+    "## 地道",
+    "判断是否像母语者的自然表达，指出生硬、直译、中式" + L + "之处。",
+    "## 得体",
+    "结合语境（对象：" + A + "；场合：" + O + "）判断语用是否得体：敬语、语气、文化习惯。",
+    "## 改写",
+    "给出 2~3 个母语者的完整替换表达，各附一句差异说明。",
+    "要求：每段 2~4 句，诊断用中文，改写保留" + L + "原文。"
+  ];
+  return lines.join("\n");
+}
+
+function parseSections(text) {
+  var out = {};
+  var re = /##\s*(语法|地道|得体|改写)/g;
+  var map = { "语法": "grammar", "地道": "natural", "得体": "polite", "改写": "rewrite" };
+  var hits = [];
+  var m;
+  while ((m = re.exec(text))) hits.push({ key: map[m[1]], start: m.index, end: re.lastIndex });
+  hits.forEach(function(h, i) {
+    var s = h.end, e = i + 1 < hits.length ? hits[i + 1].start : text.length;
+    out[h.key] = text.slice(s, e).replace(/^\s*\n?/, "").trim();
+  });
+  return out;
+}
+
+function showErr(msg) {
+  var el = document.getElementById("err");
+  el.style.display = "block";
+  el.innerHTML = msg + '<button onclick="closeErr()">打开设置</button>';
+}
+function closeErr() {
+  document.getElementById("err").style.display = "none";
+  openSheet();
+}
+
+async function analyze() {
+  if (!state.input.trim() || state.status === "loading") return;
+  closeErr();
+  if (!state.key) { showErr("请先设置 API Key"); return; }
+  state.status = "loading"; state.sections = {}; state.active = null; render();
+
+  var full = "";
+  try {
+    var res = await fetch(state.base + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + state.key },
+      body: JSON.stringify({
+        model: state.model, stream: true, temperature: 0.4,
+        messages: [
+          { role: "system", content: buildPrompt() },
+          { role: "user", content: state.input.trim() }
+        ]
+      })
+    });
+    if (!res.ok) {
+      var errBody = "";
+      try { errBody = await res.text(); } catch(e) {}
+      throw new Error("接口返回 " + res.status + "：" + errBody.slice(0, 200));
+    }
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = "";
+    while (true) {
+      var r = await reader.read();
+      if (r.done) break;
+      buf += decoder.decode(r.value, { stream: true });
+      var lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (var i = 0; i < lines.length; i++) {
+        var t = lines[i].trim();
+        if (t.indexOf("data:") !== 0) continue;
+        var p = t.slice(5).trim();
+        if (!p || p === "[DONE]") continue;
+        try {
+          var j = JSON.parse(p);
+          var d = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+          if (d) { full += d; state.sections = parseSections(full); var last = null; ["grammar","natural","polite","rewrite"].forEach(function(k){ if (state.sections[k]) last = k; }); state.active = last; render(); }
+        } catch(e) {}
+      }
+    }
+    state.status = "done"; state.active = null; render();
+  } catch (e) {
+    state.status = "error";
+    if (e.name === "TypeError") showErr("网络请求失败，可能该接口不支持浏览器直连（CORS）。建议用 Capacitor 打包成 APK，或换一个接口。");
+    else showErr(e.message || "分析失败");
+    render();
+  }
+}
+
+function openSheet() {
+  var p = state.presetId;
+  document.getElementById("baseInput").value = state.base;
+  document.getElementById("modelInput").value = state.model;
+  document.getElementById("keyInput").value = state.key;
+  document.getElementById("keyHint").textContent = "";
+  renderPresets();
+  document.getElementById("sheet").classList.add("open");
+}
+function closeSheet() { document.getElementById("sheet").classList.remove("open"); }
+
+function renderPresets() {
+  var el = document.getElementById("presets");
+  el.innerHTML = "";
+  PRESETS.forEach(function(p) {
+    var d = document.createElement("div");
+    d.className = "preset" + (state.presetId === p.id ? " on" : "");
+    d.innerHTML = '<div><div class="nm">' + p.nm + '</div><div class="desc">' + p.desc + '</div></div><div class="dot"></div>';
+    d.onclick = function() {
+      state.presetId = p.id; state.base = p.base; state.model = p.model;
+      document.getElementById("baseInput").value = p.base;
+      document.getElementById("modelInput").value = p.model;
+      document.getElementById("keyHint").textContent = p.keyHint;
+      renderPresets();
+    };
+    el.appendChild(d);
+  });
+}
+
+function saveSettings() {
+  state.base = document.getElementById("baseInput").value.trim();
+  state.model = document.getElementById("modelInput").value.trim();
+  state.key = document.getElementById("keyInput").value.trim();
+  localStorage.setItem("yj_preset", state.presetId);
+  localStorage.setItem("yj_base", state.base);
+  localStorage.setItem("yj_model", state.model);
+  localStorage.setItem("yj_key", state.key);
+  closeSheet();
+}
+
+document.getElementById("input").addEventListener("input", function() { state.input = this.value; render(); });
+
+render();
+</script>
+</body>
+</html>

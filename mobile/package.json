@@ -1,0 +1,14 @@
+{
+  "name": "yujing-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "语镜 LinguaMirror 移动版",
+  "scripts": {
+    "android": "cap add android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}
