@@ -1,0 +1,16 @@
+{
+  "name": "yujing-desktop",
+  "productName": "语镜",
+  "version": "1.0.0",
+  "private": true,
+  "description": "语镜 LinguaMirror 桌面版",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-packager . 语镜 --platform=win32 --arch=x64 --out=dist --overwrite"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-packager": "^17.1.2"
+  }
+}
