@@ -3,6 +3,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 
 const OUT_DIR = path.join(__dirname, "out");
 const DEFAULT_CLOUD_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
@@ -10,6 +11,7 @@ const DEFAULT_CLOUD_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 const DEFAULT_LOCAL_BASE = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1";
 const DEFAULT_LOCAL_MODEL = process.env.OLLAMA_MODEL || "deepseek-r1:7b";
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+const SETTINGS_FILE = process.env.YUJING_SETTINGS || path.join(os.homedir(), ".yujing", "settings.json");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -269,6 +271,38 @@ function handleOllamaPull(req, res) {
   });
 }
 
+function readSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
+  } catch (e) {
+    return {};
+  }
+}
+
+function handleGetSettings(req, res) {
+  return sendJson(res, 200, readSettings());
+}
+
+function handleSaveSettings(req, res) {
+  let raw = "";
+  req.on("data", (c) => (raw += c));
+  req.on("end", () => {
+    let body;
+    try {
+      body = JSON.parse(raw || "{}");
+    } catch {
+      return sendJson(res, 400, { error: "请求体不是合法的 JSON" });
+    }
+    try {
+      fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(body, null, 2), "utf8");
+      return sendJson(res, 200, { ok: true });
+    } catch (e) {
+      return sendJson(res, 500, { error: "保存失败：" + e.message });
+    }
+  });
+}
+
 function handler(req, res) {
   let pathname;
   try {
@@ -288,6 +322,12 @@ function handler(req, res) {
 
   if (pathname === "/api/ollama/pull") {
     if (req.method === "POST") return handleOllamaPull(req, res);
+    return sendJson(res, 405, { error: "Method Not Allowed" });
+  }
+
+  if (pathname === "/api/settings") {
+    if (req.method === "GET") return handleGetSettings(req, res);
+    if (req.method === "POST") return handleSaveSettings(req, res);
     return sendJson(res, 405, { error: "Method Not Allowed" });
   }
 

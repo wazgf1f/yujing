@@ -116,6 +116,16 @@ export function Analyzer() {
     setBackend(window.localStorage.getItem("yujing_backend") === "local" ? "local" : "cloud");
     setApiKey(window.localStorage.getItem("yujing_api_key") || "");
     setLocalModel(window.localStorage.getItem("yujing_local_model") || "deepseek-r1:7b");
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((s) => {
+        if (s && (s.backend || s.apiKey || s.localModel)) {
+          if (s.backend) setBackend(s.backend);
+          if (s.apiKey) setApiKey(s.apiKey);
+          if (s.localModel) setLocalModel(s.localModel);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   function reset() {
@@ -338,6 +348,11 @@ export function Analyzer() {
               setApiKey(k.trim());
               setLocalModel(m.trim());
               setShowSettings(false);
+              fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ backend: b, apiKey: k.trim(), localModel: m.trim() }),
+              }).catch(() => {});
             }}
             onClose={() => setShowSettings(false)}
           />
