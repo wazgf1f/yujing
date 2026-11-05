@@ -55,3 +55,10 @@ Next.js 15 · TypeScript · Tailwind CSS v4 · Motion · Electron · DeepSeek AP
 ## License
 
 MIT
+
+## 安装与更新（桌面版）
+
+- **安装**：下载「语镜安装程序.exe」双击运行，选择安装路径（默认 %LOCALAPPDATA%\Yujing），装完桌面和开始菜单会生成快捷方式。
+- **卸载**：开始菜单「语镜」→「卸载」，或运行安装目录下的「卸载.exe」。
+- **更新机制**：安装程序会把安装路径和版本写入注册表 HKCU\Software\Yujing；发布新版本后（GitHub Releases），下载新安装程序运行即可自动检测旧路径并覆盖更新。
+- 安装脚本在 electron/installer.nsi，可用 NSIS 重新编译。
