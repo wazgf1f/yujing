@@ -202,34 +202,19 @@ export function Analyzer() {
     setStatus("loading");
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input.trim(), mode: "translate", sourceLang: srcLang, targetLang: tgtLang, backend, apiKey, localModel }),
-        signal: ac.signal,
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error((data && data.error) || "翻译失败（" + res.status + "）");
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("浏览器不支持流式读取");
-
-      const decoder = new TextDecoder();
-      let full = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += decoder.decode(value, { stream: true });
-        setTranslation(full);
-      }
-
+      const codes: Record<string, string> = { "中文": "zh-CN", "英语": "en", "日语": "ja", "韩语": "ko", "俄语": "ru" };
+      const sl = codes[srcLang] || "auto";
+      const tl = codes[tgtLang] || "en";
+      const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + sl + "&tl=" + tl + "&dt=t&q=" + encodeURIComponent(input.trim());
+      const res = await fetch(url, { signal: ac.signal });
+      if (!res.ok) throw new Error("翻译接口返回 " + res.status);
+      const data = await res.json();
+      const translated = ((data[0] as string[][]) || []).map((seg) => seg[0]).join("");
+      setTranslation(translated || "（无翻译结果）");
       setStatus("done");
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setError((err as Error).message || "翻译失败，请重试");
+      setError("翻译失败：" + (err as Error).message);
       setStatus("error");
     }
   }
@@ -305,6 +290,7 @@ export function Analyzer() {
                 <Segmented options={TRANS_LANGS} value={tgtLang} onChange={setTgtLang} />
               </Field>
             </div>
+            <p className="mt-3 text-xs text-zinc-400">翻译由谷歌免费接口提供，无需 API Key、不消耗 AI 额度。</p>
           </>
         )}
 

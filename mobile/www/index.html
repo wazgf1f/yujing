@@ -158,6 +158,7 @@
       <div class="seg" id="srcSeg"></div>
       <div class="field-label">目标语言</div>
       <div class="seg" id="tgtSeg"></div>
+      <div class="hint">翻译由谷歌免费接口提供，无需 API Key、不消耗 AI 额度。</div>
     </div>
     <div class="field-label" id="inputLabel">要诊断的句子</div>
     <textarea id="input" placeholder="写一句你想诊断的外语…"></textarea>
@@ -245,47 +246,21 @@ function doAction() {
 async function translate() {
   if (!state.input.trim() || state.status === "loading") return;
   closeErr();
-  if (!state.key) { showErr("请先设置 API Key"); return; }
   state.status = "loading"; state.translation = ""; render();
-  var full = "";
   try {
-    var res = await fetch(state.base + "/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + state.key },
-      body: JSON.stringify({ model: state.model, stream: true, temperature: 0.3, messages: [
-        { role: "system", content: buildTranslatePrompt() },
-        { role: "user", content: state.input.trim() }
-      ]})
-    });
-    if (!res.ok) {
-      var eb = ""; try { eb = await res.text(); } catch(e) {}
-      throw new Error("接口返回 " + res.status + "：" + eb.slice(0, 200));
-    }
-    var reader = res.body.getReader();
-    var decoder = new TextDecoder();
-    var buf = "";
-    while (true) {
-      var r = await reader.read();
-      if (r.done) break;
-      buf += decoder.decode(r.value, { stream: true });
-      var lines = buf.split("\n");
-      buf = lines.pop() || "";
-      for (var i = 0; i < lines.length; i++) {
-        var t = lines[i].trim();
-        if (t.indexOf("data:") !== 0) continue;
-        var p = t.slice(5).trim();
-        if (!p || p === "[DONE]") continue;
-        try {
-          var j = JSON.parse(p);
-          var d = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-          if (d) { full += d; state.translation = full; render(); }
-        } catch(e) {}
-      }
-    }
+    var codes = { "中文": "zh-CN", "英语": "en", "日语": "ja", "韩语": "ko", "俄语": "ru" };
+    var sl = codes[state.srcLang] || "auto";
+    var tl = codes[state.tgtLang] || "en";
+    var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + sl + "&tl=" + tl + "&dt=t&q=" + encodeURIComponent(state.input.trim());
+    var res = await fetch(url);
+    if (!res.ok) throw new Error("翻译接口返回 " + res.status);
+    var data = await res.json();
+    var translated = (data[0] || []).map(function(seg){ return seg[0]; }).join("");
+    state.translation = translated || "（无翻译结果）";
     state.status = "done"; render();
   } catch (e) {
     state.status = "error";
-    if (e.name === "TypeError") showErr("网络请求失败，可能该接口不支持浏览器直连（CORS）。");
+    if (e.name === "TypeError") showErr("网络请求失败，请检查网络连接。");
     else showErr(e.message || "翻译失败");
     render();
   }
