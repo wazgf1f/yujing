@@ -47,6 +47,11 @@ Next.js 15 · TypeScript · Tailwind CSS v4 · Motion · Electron · DeepSeek AP
 - electron/   —— Electron 桌面壳（main.js + 打包配置）
 - server.js   —— 零依赖 Node 服务（静态文件 + LLM 流式 + Ollama 管理）
 
+## 作者与致谢
+
+- **作者**：大连外国语大学软件学院 陈肇睿
+- **说明**：本软件前端 UI 由本人制作，其余部分交由 DeepSeek 完成，并由本人进行源码的审阅及修改。
+
 ## License
 
 MIT
