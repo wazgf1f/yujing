@@ -121,6 +121,10 @@ function streamLLM({ baseUrl, model, apiKey, messages, res }) {
   upstream.end(payload);
 }
 
+function buildTranslatePrompt(sourceLang, targetLang) {
+  return "你是一位专业翻译专家。请把用户发来的" + sourceLang + "文本翻译成" + targetLang + "。\n要求：只输出翻译结果本身，不要任何解释、注释、引号或额外文字；翻译要准确、自然、地道，保持原文的语气和风格。";
+}
+
 function handleChat(req, res) {
   let raw = "";
   req.on("data", (c) => (raw += c));
@@ -139,10 +143,20 @@ function handleChat(req, res) {
       return sendJson(res, 400, { error: "请输入要诊断的句子" });
     }
 
-    const messages = [
-      { role: "system", content: buildSystemPrompt(lang, audience, occasion) },
-      { role: "user", content: text.trim() },
-    ];
+    let messages;
+    if (body.mode === "translate") {
+      const sourceLang = body.sourceLang || "中文";
+      const targetLang = body.targetLang || "英语";
+      messages = [
+        { role: "system", content: buildTranslatePrompt(sourceLang, targetLang) },
+        { role: "user", content: text.trim() },
+      ];
+    } else {
+      messages = [
+        { role: "system", content: buildSystemPrompt(lang, audience, occasion) },
+        { role: "user", content: text.trim() },
+      ];
+    }
 
     if (body.backend === "local") {
       const baseUrl = body.localBaseUrl || DEFAULT_LOCAL_BASE;

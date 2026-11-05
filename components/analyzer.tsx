@@ -31,6 +31,8 @@ const AUDIENCES = ["老师", "同学", "陌生人", "长辈"] as const;
 type Audience = (typeof AUDIENCES)[number];
 const OCCASIONS = ["正式", "半正式", "日常"] as const;
 type Occasion = (typeof OCCASIONS)[number];
+const TRANS_LANGS = ["中文", "英语", "日语", "韩语", "俄语"] as const;
+type TransLang = (typeof TRANS_LANGS)[number];
 
 type SectionKey = "grammar" | "natural" | "polite" | "rewrite";
 type Backend = "cloud" | "local";
@@ -109,6 +111,10 @@ export function Analyzer() {
   const [backend, setBackend] = useState<Backend>("cloud");
   const [apiKey, setApiKey] = useState("");
   const [localModel, setLocalModel] = useState("deepseek-r1:7b");
+  const [mode, setMode] = useState<"diagnose" | "translate">("diagnose");
+  const [srcLang, setSrcLang] = useState<TransLang>("中文");
+  const [tgtLang, setTgtLang] = useState<TransLang>("英语");
+  const [translation, setTranslation] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -132,6 +138,7 @@ export function Analyzer() {
     abortRef.current?.abort();
     setSections({});
     setActive(null);
+    setTranslation("");
     setStatus("idle");
     setError("");
   }
@@ -184,6 +191,49 @@ export function Analyzer() {
     }
   }
 
+  async function translate() {
+    if (!input.trim() || status === "loading") return;
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setError("");
+    setTranslation("");
+    setStatus("loading");
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: input.trim(), mode: "translate", sourceLang: srcLang, targetLang: tgtLang, backend, apiKey, localModel }),
+        signal: ac.signal,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error((data && data.error) || "翻译失败（" + res.status + "）");
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("浏览器不支持流式读取");
+
+      const decoder = new TextDecoder();
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value, { stream: true });
+        setTranslation(full);
+      }
+
+      setStatus("done");
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setError((err as Error).message || "翻译失败，请重试");
+      setStatus("error");
+    }
+  }
+
   const backendReady = backend === "local" || !!apiKey;
   const backendLabel =
     backend === "local" ? "本地 · " + tierShort(localModel) : apiKey ? "云端 · 已设置 Key" : "云端 · 设置 Key";
@@ -197,7 +247,22 @@ export function Analyzer() {
         className="rounded-3xl border border-zinc-200/70 bg-white/80 p-5 shadow-[0_24px_70px_-40px_rgba(24,24,27,0.5)] backdrop-blur-xl sm:p-7"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
-          <span className="text-xs font-medium text-zinc-400">模型来源</span>
+          <div className="flex rounded-xl bg-zinc-100 p-1">
+            <button
+              type="button"
+              onClick={() => setMode("diagnose")}
+              className={cn("rounded-lg px-3.5 py-1.5 text-sm font-medium transition", mode === "diagnose" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500")}
+            >
+              诊断
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("translate")}
+              className={cn("rounded-lg px-3.5 py-1.5 text-sm font-medium transition", mode === "translate" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500")}
+            >
+              翻译
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setShowSettings(true)}
@@ -213,27 +278,42 @@ export function Analyzer() {
           </button>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field icon={Languages} label="目标语言">
-            <Segmented options={LANGS} value={lang} onChange={setLang} />
-          </Field>
-          <Field icon={CalendarDays} label="场合">
-            <Segmented options={OCCASIONS} value={occasion} onChange={setOccasion} />
-          </Field>
-        </div>
+        {mode === "diagnose" ? (
+          <>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field icon={Languages} label="目标语言">
+                <Segmented options={LANGS} value={lang} onChange={setLang} />
+              </Field>
+              <Field icon={CalendarDays} label="场合">
+                <Segmented options={OCCASIONS} value={occasion} onChange={setOccasion} />
+              </Field>
+            </div>
 
-        <div className="mt-5">
-          <Field icon={Users} label="交流对象">
-            <Segmented options={AUDIENCES} value={audience} onChange={setAudience} />
-          </Field>
-        </div>
+            <div className="mt-5">
+              <Field icon={Users} label="交流对象">
+                <Segmented options={AUDIENCES} value={audience} onChange={setAudience} />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field icon={Languages} label="源语言">
+                <Segmented options={TRANS_LANGS} value={srcLang} onChange={setSrcLang} />
+              </Field>
+              <Field icon={Sparkles} label="目标语言">
+                <Segmented options={TRANS_LANGS} value={tgtLang} onChange={setTgtLang} />
+              </Field>
+            </div>
+          </>
+        )}
 
         <div className="relative mt-5">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             rows={3}
-            placeholder={"用" + lang + "写一句你想说的话…"}
+            placeholder={mode === "translate" ? "输入要翻译的文本…" : "用" + lang + "写一句你想说的话…"}
             className="w-full resize-none rounded-2xl border border-zinc-200 bg-zinc-50/60 px-4 py-3.5 pr-10 text-[15px] leading-relaxed text-zinc-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
           />
           {input && (
@@ -248,7 +328,8 @@ export function Analyzer() {
           )}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        {mode === "diagnose" && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-xs text-zinc-400">试试示例：</span>
           {PRESETS.map((p) => (
             <button
@@ -265,29 +346,30 @@ export function Analyzer() {
               {p.lang} · {p.audience} · {p.occasion}
             </button>
           ))}
-        </div>
+          </div>
+        )}
 
         <div className="mt-5 flex items-center gap-3">
           <button
             type="button"
-            onClick={analyze}
+            onClick={mode === "translate" ? translate : analyze}
             disabled={!input.trim() || status === "loading"}
             className="animate-pulse-glow inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {status === "loading" ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                正在诊断…
+                {mode === "translate" ? "正在翻译…" : "正在诊断…"}
               </>
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                一键诊断
+                {mode === "translate" ? "翻译" : "一键诊断"}
               </>
             )}
           </button>
 
-          {(status === "done" || status === "error" || sections.grammar) && (
+          {(status === "done" || status === "error" || sections.grammar || translation) && (
             <button
               type="button"
               onClick={reset}
@@ -324,16 +406,20 @@ export function Analyzer() {
       </motion.div>
 
       <div className="space-y-3">
-        {SECTIONS.map((s, i) => (
-          <FeedbackCard
-            key={s.key}
-            def={s}
-            index={i}
-            text={sections[s.key]}
-            isActive={active === s.key}
-            isStreaming={status === "loading"}
-          />
-        ))}
+        {mode === "translate" ? (
+          <TranslationCard text={translation} isStreaming={status === "loading"} />
+        ) : (
+          SECTIONS.map((s, i) => (
+            <FeedbackCard
+              key={s.key}
+              def={s}
+              index={i}
+              text={sections[s.key]}
+              isActive={active === s.key}
+              isStreaming={status === "loading"}
+            />
+          ))
+        )}
 
         {showSettings && (
           <SettingsModal
@@ -459,6 +545,39 @@ function FeedbackCard({
             <Skeleton />
           ) : (
             <p className="text-zinc-300">等待分析…</p>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function TranslationCard({ text, isStreaming }: { text: string; isStreaming: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="relative flex gap-4 rounded-2xl border border-indigo-100 bg-white/90 p-4 shadow-sm backdrop-blur"
+    >
+      <div className="w-1 shrink-0 self-stretch rounded-full bg-indigo-500" />
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
+        <Sparkles className="h-5 w-5 text-indigo-600" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-sm font-semibold text-zinc-900">翻译结果</h3>
+        </div>
+        <div className="mt-1.5 text-[15px] leading-relaxed text-zinc-700">
+          {text ? (
+            <p className="whitespace-pre-wrap">
+              {text}
+              {isStreaming && <Cursor />}
+            </p>
+          ) : isStreaming ? (
+            <Skeleton />
+          ) : (
+            <p className="text-zinc-300">等待翻译…</p>
           )}
         </div>
       </div>

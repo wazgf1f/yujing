@@ -57,6 +57,9 @@
     padding: 7px 13px; border-radius: 999px; cursor: pointer; transition: all .15s;
   }
   .seg button.on { background: #18181b; color: #fff; }
+  .mode-toggle { display: flex; background: #f4f4f5; border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  .mode-toggle button { flex: 1; border: none; background: transparent; color: #52525b; font-size: 14px; font-weight: 600; padding: 8px 0; border-radius: 10px; cursor: pointer; transition: all .15s; }
+  .mode-toggle button.on { background: #fff; color: #18181b; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   textarea {
     width: 100%; min-height: 96px; margin-top: 6px; resize: none;
     border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px;
@@ -138,15 +141,27 @@
 
 <main>
   <section class="card">
-    <div class="field-label">目标语言</div>
-    <div class="seg" id="langSeg"></div>
-    <div class="field-label">交流对象</div>
-    <div class="seg" id="audSeg"></div>
-    <div class="field-label">场合</div>
-    <div class="seg" id="occSeg"></div>
-    <div class="field-label">要诊断的句子</div>
+    <div class="mode-toggle">
+      <button id="modeDiagBtn" class="on" onclick="setMode('diagnose')">诊断</button>
+      <button id="modeTransBtn" onclick="setMode('translate')">翻译</button>
+    </div>
+    <div id="diagControls">
+      <div class="field-label">目标语言</div>
+      <div class="seg" id="langSeg"></div>
+      <div class="field-label">交流对象</div>
+      <div class="seg" id="audSeg"></div>
+      <div class="field-label">场合</div>
+      <div class="seg" id="occSeg"></div>
+    </div>
+    <div id="transControls" style="display:none">
+      <div class="field-label">源语言</div>
+      <div class="seg" id="srcSeg"></div>
+      <div class="field-label">目标语言</div>
+      <div class="seg" id="tgtSeg"></div>
+    </div>
+    <div class="field-label" id="inputLabel">要诊断的句子</div>
     <textarea id="input" placeholder="写一句你想诊断的外语…"></textarea>
-    <button id="analyzeBtn" onclick="analyze()">✨ 一键诊断</button>
+    <button id="analyzeBtn" onclick="doAction()">✨ 一键诊断</button>
     <div id="err"></div>
   </section>
 
@@ -182,6 +197,7 @@ var PRESETS = [
 var LANGS = ["英语", "日语", "韩语"];
 var AUDS = ["老师", "同学", "陌生人", "长辈"];
 var OCCS = ["正式", "半正式", "日常"];
+var TRANS_LANGS = ["中文", "英语", "日语", "韩语", "俄语"];
 
 var SECTIONS = [
   { key: "grammar", title: "语法", sub: "有没有错", bar: "#10b981", bg: "#ecfdf5", fg: "#059669" },
@@ -196,7 +212,8 @@ var state = {
   base: localStorage.getItem("yj_base") || PRESETS[0].base,
   model: localStorage.getItem("yj_model") || PRESETS[0].model,
   key: localStorage.getItem("yj_key") || "",
-  sections: {}, active: null, status: "idle"
+  sections: {}, active: null, status: "idle",
+  mode: "diagnose", srcLang: "中文", tgtLang: "英语", translation: ""
 };
 
 function buildSeg(elId, opts, cur, cb) {
@@ -211,17 +228,102 @@ function buildSeg(elId, opts, cur, cb) {
   });
 }
 
+function setMode(m) {
+  state.mode = m;
+  render();
+}
+
+function buildTranslatePrompt() {
+  return "你是一位专业翻译专家。请把用户发来的" + state.srcLang + "文本翻译成" + state.tgtLang + "。\n要求：只输出翻译结果本身，不要任何解释、注释、引号或额外文字；翻译要准确、自然、地道，保持原文的语气和风格。";
+}
+
+function doAction() {
+  if (state.mode === "translate") translate();
+  else analyze();
+}
+
+async function translate() {
+  if (!state.input.trim() || state.status === "loading") return;
+  closeErr();
+  if (!state.key) { showErr("请先设置 API Key"); return; }
+  state.status = "loading"; state.translation = ""; render();
+  var full = "";
+  try {
+    var res = await fetch(state.base + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + state.key },
+      body: JSON.stringify({ model: state.model, stream: true, temperature: 0.3, messages: [
+        { role: "system", content: buildTranslatePrompt() },
+        { role: "user", content: state.input.trim() }
+      ]})
+    });
+    if (!res.ok) {
+      var eb = ""; try { eb = await res.text(); } catch(e) {}
+      throw new Error("接口返回 " + res.status + "：" + eb.slice(0, 200));
+    }
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = "";
+    while (true) {
+      var r = await reader.read();
+      if (r.done) break;
+      buf += decoder.decode(r.value, { stream: true });
+      var lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (var i = 0; i < lines.length; i++) {
+        var t = lines[i].trim();
+        if (t.indexOf("data:") !== 0) continue;
+        var p = t.slice(5).trim();
+        if (!p || p === "[DONE]") continue;
+        try {
+          var j = JSON.parse(p);
+          var d = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+          if (d) { full += d; state.translation = full; render(); }
+        } catch(e) {}
+      }
+    }
+    state.status = "done"; render();
+  } catch (e) {
+    state.status = "error";
+    if (e.name === "TypeError") showErr("网络请求失败，可能该接口不支持浏览器直连（CORS）。");
+    else showErr(e.message || "翻译失败");
+    render();
+  }
+}
+
 function render() {
   buildSeg("langSeg", LANGS, state.lang, function(v){ state.lang = v; render(); });
   buildSeg("audSeg", AUDS, state.audience, function(v){ state.audience = v; render(); });
   buildSeg("occSeg", OCCS, state.occasion, function(v){ state.occasion = v; render(); });
+  buildSeg("srcSeg", TRANS_LANGS, state.srcLang, function(v){ state.srcLang = v; render(); });
+  buildSeg("tgtSeg", TRANS_LANGS, state.tgtLang, function(v){ state.tgtLang = v; render(); });
+
+  document.getElementById("modeDiagBtn").className = state.mode === "diagnose" ? "on" : "";
+  document.getElementById("modeTransBtn").className = state.mode === "translate" ? "on" : "";
+  document.getElementById("diagControls").style.display = state.mode === "diagnose" ? "" : "none";
+  document.getElementById("transControls").style.display = state.mode === "translate" ? "" : "none";
+  document.getElementById("inputLabel").textContent = state.mode === "translate" ? "要翻译的文本" : "要诊断的句子";
+  document.getElementById("input").placeholder = state.mode === "translate" ? "输入要翻译的文本…" : "写一句你想诊断的外语…";
 
   var btn = document.getElementById("analyzeBtn");
   btn.disabled = !state.input.trim() || state.status === "loading";
-  btn.textContent = state.status === "loading" ? "正在诊断…" : "✨ 一键诊断";
+  btn.textContent = state.status === "loading" ? (state.mode === "translate" ? "正在翻译…" : "正在诊断…") : (state.mode === "translate" ? "✨ 翻译" : "✨ 一键诊断");
 
   var rs = document.getElementById("results");
   rs.innerHTML = "";
+  if (state.mode === "translate") {
+    var tc = document.createElement("div");
+    tc.className = "res-card";
+    var tbody = "";
+    if (state.translation) tbody = escapeHtml(state.translation) + (state.status === "loading" ? '<span class="cursor"></span>' : "");
+    else if (state.status === "loading") tbody = '<div class="sk w80"></div><div class="sk w60"></div>';
+    else tbody = '<span class="wait">等待翻译…</span>';
+    tc.innerHTML = '<div class="res-bar" style="background:#6366f1"></div>' +
+      '<div class="res-icon" style="background:#eef2ff;color:#4f46e5;font-size:16px">✦</div>' +
+      '<div style="flex:1;min-width:0"><div class="res-title">翻译结果</div><div class="res-body">' + tbody + '</div></div>';
+    rs.appendChild(tc);
+    return;
+  }
   SECTIONS.forEach(function(s) {
     var c = document.createElement("div");
     c.className = "res-card";
